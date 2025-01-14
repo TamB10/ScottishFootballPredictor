@@ -1,30 +1,53 @@
 {
-  "version": "1.0.0",
+{
+  "version": "1.0.1",
   "lastUpdated": "2024-01-14",
   "leagues": {
     "Premiership": {
       "teams": {
         "Celtic": {
           "strength": 1.4,
+          "position": 1,
           "recentForm": [3, 3, 3, 1, 3],
           "homeRecord": {
             "wins": 10,
             "draws": 1,
-            "losses": 0
+            "losses": 0,
+            "goalsFor": 35,
+            "goalsAgainst": 8
           }
         },
         "Rangers": {
           "strength": 1.35,
+          "position": 2,
           "recentForm": [3, 3, 3, 3, 0],
           "homeRecord": {
             "wins": 9,
             "draws": 1,
-            "losses": 1
+            "losses": 1,
+            "goalsFor": 28,
+            "goalsAgainst": 10
           }
         }
-        // ... other teams
+      }
+    },
+    "Championship": {
+      "teams": {
+        "Dundee United": {
+          "strength": 1.2,
+          "position": 1,
+          "recentForm": [3, 3, 1, 3, 3],
+          "homeRecord": {
+            "wins": 8,
+            "draws": 2,
+            "losses": 1,
+            "goalsFor": 24,
+            "goalsAgainst": 12
+          }
+        }
+        // Add other Championship teams...
       }
     }
-    // ... other leagues
+    // Add League One and League Two...
   }
 }
