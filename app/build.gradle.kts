@@ -40,7 +40,7 @@ android {
 
 // Define the runScraper task for the Android app's main source set
 tasks.register<JavaExec>("runScraper") {
-    dependsOn("compileKotlin")
+    dependsOn("compileDebugKotlin")
     classpath = files(
         android.applicationVariants.firstOrNull { it.name == "debug" }?.let { variant ->
             variant.compileConfiguration + variant.runtimeConfiguration
