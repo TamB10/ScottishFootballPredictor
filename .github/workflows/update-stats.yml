@@ -22,16 +22,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
         
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-        
-      - name: Create stats directory
-        run: mkdir -p stats
-
-      - name: Build and Run Scraper with Debug
+      - name: Show project structure
         run: |
+          pwd
           ls -la
-          ./gradlew runScraper --stacktrace --info
+          ls -la app/src/main/java/com/tam/scottishfootballpredictor/update/
+          
+      - name: Build and Run Scraper with Full Debug
+        run: |
+          ./gradlew tasks --all
+          ./gradlew runScraper --stacktrace --info --warning-mode all
           
       - name: Commit and push if changes
         run: |
