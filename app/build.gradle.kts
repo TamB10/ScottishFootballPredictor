@@ -43,15 +43,15 @@ tasks.register<JavaExec>("runScraper") {
     group = "scraping"
     description = "Runs the table scraper"
 
-    dependsOn("compileDebugJava", "compileDebugKotlin")
+    dependsOn("compileDebugKotlin")
 
-    classpath(
-        files(
+    doFirst {
+        classpath = files(
             android.sourceSets.getByName("main").java.srcDirs,
             project.buildDir.resolve("tmp/kotlin-classes/debug"),
-            project.configurations.getByName("debugRuntimeClasspath")
+            configurations.getByName("debugCompileClasspath")
         )
-    )
+    }
 
     mainClass.set("com.tam.scottishfootballpredictor.update.StatsScraperKt")
 }
