@@ -26,7 +26,6 @@ android {
             )
         }
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -39,8 +38,11 @@ android {
     }
 }
 
-tasks.register("runScraper", JavaExec::class) {
-    classpath = project.sourceSets["main"].runtimeClasspath
+// Define the runScraper task for the Android app's main source set
+tasks.register<JavaExec>("runScraper") {
+    classpath = files(android.sourceSets.getByName("main").java.srcDirs) +
+            files(android.bootClasspath) +
+            configurations.getByName("implementation")
     mainClass.set("com.tam.scottishfootballpredictor.update.StatsScraperKt")
 }
 
