@@ -22,21 +22,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
         
-      - name: Show project structure
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+        
+      - name: Build and Run Scraper with Debug
         run: |
-          pwd
-          ls -la
-          ls -la app/src/main/java/com/tam/scottishfootballpredictor/update/
-          
-      - name: Build and Run Scraper with Full Debug
-        run: |
-          ./gradlew tasks --all
-          ./gradlew runScraper --stacktrace --info --warning-mode all
+          mkdir -p stats
+          ./gradlew runScraper --stacktrace --info
           
       - name: Commit and push if changes
         run: |
           git config --global user.name 'GitHub Action'
           git config --global user.email 'action@github.com'
-          git add stats/
-          git commit -m "Update stats data" || exit 0
+          git add stats/* || true
+          git commit -m "Update stats data" || true
           git push
