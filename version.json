@@ -1,5 +1,9 @@
 {
   "version": "1.0.0",
+<<<<<<< HEAD
   "downloadUrl": "https://github.com/TamB10/ScottishFootballPredictor/releases/download/v1.0.0/app-release.apk",
+=======
+  "downloadUrl": "https://github.com/YOUR_USERNAME/ScottishFootballPredictor/releases/download/v1.0.0/app-release.apk",
+>>>>>>> 5bd616a6ab9e15fa6d9c6a0fe155a03f289a5ec8
   "changelog": "Initial release"
 }
