@@ -8,6 +8,8 @@ on:
 jobs:
   update-stats:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v3
       
@@ -26,8 +28,9 @@ jobs:
       - name: Create stats directory
         run: mkdir -p stats
 
-      - name: Build and Run Scraper
+      - name: Build and Run Scraper with Debug
         run: |
+          ls -la
           ./gradlew runScraper --stacktrace --info
           
       - name: Commit and push if changes
