@@ -1,0 +1,36 @@
+name: Update Stats
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Runs every 6 hours
+  workflow_dispatch:        # Allows manual trigger
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+        
+      - name: Create stats directory
+        run: mkdir -p stats
+
+      - name: Build and Run Scraper
+        run: |
+          ./gradlew runScraper
+          
+      - name: Commit and push if changes
+        run: |
+          git config --global user.name 'GitHub Action'
+          git config --global user.email 'action@github.com'
+          git add stats/
+          git commit -m "Update stats data" || exit 0
+          git push
