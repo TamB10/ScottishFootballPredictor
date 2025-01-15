@@ -15,7 +15,9 @@ class TableScraper {
 
     fun scrapeAndGenerateJson(): String {
         val leagueData = leagues.mapValues { (_, url) ->
-            val doc = Jsoup.connect(url).get()
+            val doc = Jsoup.connect(url)
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+                .get()
             scrapeTeamData(doc)
         }
 
@@ -23,17 +25,21 @@ class TableScraper {
     }
 
     private fun scrapeTeamData(doc: Document): List<TeamData> {
-        return doc.select("table.league-table tbody tr").map { row ->
+        println("Scraping HTML: ${doc.html()}")  // Debug line
+
+        return doc.select("table tbody tr").map { row ->
+            println("Processing row: ${row.html()}")  // Debug line
+
             TeamData(
-                name = row.select("td.team-name").text(),
-                position = row.select("td.position").text().toIntOrNull() ?: 0,
-                played = row.select("td.played").text().toIntOrNull() ?: 0,
-                won = row.select("td.won").text().toIntOrNull() ?: 0,
-                drawn = row.select("td.drawn").text().toIntOrNull() ?: 0,
-                lost = row.select("td.lost").text().toIntOrNull() ?: 0,
-                goalsFor = row.select("td.goals-for").text().toIntOrNull() ?: 0,
-                goalsAgainst = row.select("td.goals-against").text().toIntOrNull() ?: 0,
-                cleanSheets = row.select("td.clean-sheets").text().toIntOrNull() ?: 0
+                name = row.select("td:nth-child(2)").text(),
+                position = row.select("td:nth-child(1)").text().toIntOrNull() ?: 0,
+                played = row.select("td:nth-child(3)").text().toIntOrNull() ?: 0,
+                won = row.select("td:nth-child(4)").text().toIntOrNull() ?: 0,
+                drawn = row.select("td:nth-child(5)").text().toIntOrNull() ?: 0,
+                lost = row.select("td:nth-child(6)").text().toIntOrNull() ?: 0,
+                goalsFor = row.select("td:nth-child(7)").text().toIntOrNull() ?: 0,
+                goalsAgainst = row.select("td:nth-child(8)").text().toIntOrNull() ?: 0,
+                cleanSheets = row.select("td:nth-child(9)").text().toIntOrNull() ?: 0
             )
         }
     }
@@ -67,8 +73,6 @@ class TableScraper {
     }
 
     private fun calculateForm(team: TeamData): Form {
-        // This would ideally come from recent matches data
-        // For now, generate based on overall performance
         val winRate = team.won.toDouble() / team.played
         val drawRate = team.drawn.toDouble() / team.played
 
