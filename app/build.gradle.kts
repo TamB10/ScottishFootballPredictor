@@ -40,9 +40,12 @@ android {
 
 // Define the runScraper task for the Android app's main source set
 tasks.register<JavaExec>("runScraper") {
-    classpath = files(android.sourceSets.getByName("main").java.srcDirs) +
-            files(android.bootClasspath) +
-            configurations.getByName("implementation")
+    dependsOn("compileKotlin")
+    classpath = files(
+        android.applicationVariants.firstOrNull { it.name == "debug" }?.let { variant ->
+            variant.compileConfiguration + variant.runtimeConfiguration
+        }
+    )
     mainClass.set("com.tam.scottishfootballpredictor.update.StatsScraperKt")
 }
 
