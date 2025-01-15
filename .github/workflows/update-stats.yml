@@ -28,7 +28,7 @@ jobs:
 
       - name: Build and Run Scraper
         run: |
-          ./gradlew runScraper
+          ./gradlew runScraper --stacktrace --info
           
       - name: Commit and push if changes
         run: |
