@@ -37,22 +37,37 @@ class TableScraper {
     }
 
     private fun scrapeTeamData(doc: Document): List<TeamData> {
-        val rows = doc.select("table.gs-o-table tr")
-        println("Found ${rows.size} rows")
+        println("\n=== Starting to scrape team data ===")
+        println("Document HTML: ${doc.html()}")  // See what HTML we're getting
+
+        val table = doc.select("table.gs-o-table")
+        println("Found ${table.size} tables with class gs-o-table")
+
+        // Try alternate selectors if main one fails
+        if (table.isEmpty()) {
+            println("Trying alternate selectors...")
+            val allTables = doc.select("table")
+            println("Found ${allTables.size} total tables")
+            allTables.forEachIndexed { index, t ->
+                println("Table $index classes: ${t.classNames()}")
+                println("Table $index content: ${t.html()}")
+            }
+        }
+
+        val rows = table.select("tr:not(:first-child)")  // Skip header row
+        println("Found ${rows.size} team rows")
 
         return rows.mapNotNull { row ->
             try {
-                // Skip header rows
-                if (row.select("th").isNotEmpty()) {
-                    return@mapNotNull null
-                }
-
+                println("\nProcessing row: ${row.html()}")
                 val cells = row.select("td")
-                if (cells.isEmpty()) {
-                    return@mapNotNull null
+                println("Found ${cells.size} cells in row")
+
+                cells.forEachIndexed { index, cell ->
+                    println("Cell $index content: ${cell.text()}")
                 }
 
-                TeamData(
+                val teamData = TeamData(
                     position = cells.getOrNull(0)?.text()?.toIntOrNull() ?: 0,
                     name = cells.getOrNull(1)?.select("abbr")?.attr("title") ?:
                     cells.getOrNull(1)?.text() ?: "Unknown",
@@ -62,17 +77,23 @@ class TableScraper {
                     lost = cells.getOrNull(5)?.text()?.toIntOrNull() ?: 0,
                     goalsFor = cells.getOrNull(6)?.text()?.toIntOrNull() ?: 0,
                     goalsAgainst = cells.getOrNull(7)?.text()?.toIntOrNull() ?: 0,
-                    cleanSheets = 0  // Not available in BBC table
-                ).also { team ->
-                    println("Parsed team: ${team.name}, Pos: ${team.position}")
-                }
+                    cleanSheets = 0
+                )
+
+                println("Created team data: $teamData")
+                teamData
+
             } catch (e: Exception) {
-                println("Error parsing row: ${e.message}")
+                println("Error processing row: ${e.message}")
+                println("Row HTML causing error: ${row.html()}")
+                e.printStackTrace()
                 null
             }
+        }.also { teams ->
+            println("\nTotal teams parsed: ${teams.size}")
+            teams.forEach { println(it) }
         }
     }
-
     private fun formatToJson(leagueData: Map<String, List<TeamData>>): String {
         val statsUpdate = StatsUpdate(
             version = "1.0.${LocalDate.now()}",
