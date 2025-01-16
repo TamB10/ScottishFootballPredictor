@@ -17,49 +17,86 @@ class TableScraper {
         try {
             val leagueData = leagues.mapValues { (leagueName, url) ->
                 try {
-                    println("Starting to scrape $leagueName from $url")
-                    val response = Jsoup.connect(url)
+                    println("\n\nScraping $leagueName from $url")
+
+                    val doc = Jsoup.connect(url)
                         .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                        .timeout(30000) // Increased timeout
-                        .ignoreHttpErrors(true) // Add this to see any HTTP errors
-                        .execute()
+                        .timeout(30000)
+                        .get()
 
-                    println("HTTP Status Code for $leagueName: ${response.statusCode()}")
-                    println("HTTP Status Message: ${response.statusMessage()}")
+                    println("Got page HTML. Looking for tables...")
+                    println("Found ${doc.select("table").size} tables on page")
 
-                    val doc = response.parse()
-                    println("HTML Content Length: ${doc.html().length}")
-                    println("First 500 chars of HTML: ${doc.html().take(500)}")
+                    // Print the actual HTML of the first table we find
+                    doc.select("table").firstOrNull()?.let {
+                        println("\nFirst table HTML:\n${it.html()}")
+                    }
 
-                    val teamsData = scrapeTeamData(doc)
-                    println("Teams found for $leagueName: ${teamsData.size}")
-                    teamsData
+                    // Print all table selectors we can find
+                    println("\nAll table selectors found:")
+                    doc.select("table").forEach { table ->
+                        println("Table class: ${table.className()}")
+                        println("Table id: ${table.id()}")
+                    }
+
+                    val teams = scrapeTeamData(doc)
+                    println("\nScraped ${teams.size} teams from $leagueName")
+                    teams
+
                 } catch (e: Exception) {
-                    println("Error scraping $leagueName")
+                    println("\nError scraping $leagueName: ${e.message}")
                     e.printStackTrace()
                     emptyList()
                 }
             }
 
-            // Check if any data was scraped
-            val totalTeams = leagueData.values.sumOf { it.size }
-            println("Total teams scraped across all leagues: $totalTeams")
+            // Print what we're about to convert to JSON
+            println("\nPreparing to create JSON for leagues:")
+            leagueData.forEach { (league, teams) ->
+                println("$league: ${teams.size} teams")
+                teams.forEach { team ->
+                    println("  - ${team.name}: pos ${team.position}, played ${team.played}")
+                }
+            }
 
-            return formatToJson(leagueData)
+            val json = formatToJson(leagueData)
+            println("\nGenerated JSON length: ${json.length}")
+            println("First 500 chars of JSON: ${json.take(500)}")
+
+            return json
+
         } catch (e: Exception) {
-            println("Fatal error in scraping")
+            println("\nFatal error in scraping: ${e.message}")
             e.printStackTrace()
             return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{},\"error\":\"${e.message}\"}"
         }
     }
 
     private fun scrapeTeamData(doc: Document): List<TeamData> {
-        println("\nStarting to parse document")
+        println("\nStarting to parse document for team data")
 
-        val tableRows = doc.select("table tr")
-        println("Found ${tableRows.size} rows in total")
+        // Try multiple table selectors
+        val tables = doc.select("table, .league-table, .standings")
+        println("Found ${tables.size} potential tables")
 
-        return tableRows.drop(1).mapNotNull { row -> // drop header row
+        val tableToUse = tables.firstOrNull { table ->
+            // Look for a table that has the expected column structure
+            val headerRow = table.select("tr").firstOrNull()
+            val headerCells = headerRow?.select("th")?.size ?: 0
+            println("Table with ${headerCells} header cells found")
+            headerCells >= 13  // We expect at least 13 columns for a valid table
+        }
+
+        if (tableToUse == null) {
+            println("No suitable table found!")
+            return emptyList()
+        }
+
+        println("Found suitable table, processing rows...")
+        val rows = tableToUse.select("tr:not(:first-child)") // Skip header row
+        println("Processing ${rows.size} team rows")
+
+        return rows.mapNotNull { row ->
             try {
                 val cells = row.select("td")
                 if (cells.size < 15) {
@@ -67,8 +104,7 @@ class TableScraper {
                     return@mapNotNull null
                 }
 
-                // Mapping based on actual table structure:
-                // Position | Team | HOME (P W D L GF GA) | AWAY (W D L GF GA) | GD | PTS
+                // Mapping based on actual table structure
                 val position = cells[0].text().toIntOrNull() ?: 0
                 val name = cells[1].text()
 
@@ -119,11 +155,9 @@ class TableScraper {
         val statsUpdate = StatsUpdate(
             version = "1.0.${LocalDate.now()}",
             lastUpdated = LocalDate.now().toString(),
-            leagues = leagueData.mapValues { (leagueName, teams) ->
-                println("Formatting league: $leagueName with ${teams.size} teams")
+            leagues = leagueData.mapValues { (_, teams) ->
                 LeagueData(
                     teams = teams.associate { team ->
-                        println("Processing team: ${team.name}")
                         team.name to TeamStats(
                             position = team.position,
                             stats = TeamStatistics(
@@ -142,9 +176,7 @@ class TableScraper {
             }
         )
 
-        val json = GsonBuilder().setPrettyPrinting().create().toJson(statsUpdate)
-        println("Generated JSON: $json")
-        return json
+        return GsonBuilder().setPrettyPrinting().create().toJson(statsUpdate)
     }
 
     private fun calculateForm(team: TeamData): Form {
