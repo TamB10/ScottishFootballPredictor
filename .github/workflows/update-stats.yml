@@ -25,6 +25,9 @@ jobs:
       - name: Setup ChromeDriver
         uses: nanasess/setup-chromedriver@master
           
+      - name: Create stats directory
+        run: mkdir -p stats
+          
       - name: Start ChromeDriver
         run: |
           export DISPLAY=:99
@@ -40,6 +43,6 @@ jobs:
         run: |
           git config --global user.name 'GitHub Action'
           git config --global user.email 'action@github.com'
-          git add stats/
-          git commit -m "Update stats data" || exit 0
-          git push
+          git add stats/* || true  # Added || true to prevent failure if directory is empty
+          git commit -m "Update stats data" || true
+          git push || true
