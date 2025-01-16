@@ -56,49 +56,46 @@ class TableScraper {
     private fun scrapeTeamData(doc: Document): List<TeamData> {
         println("\nStarting to parse document")
 
-        // Try to find the table first
-        val tables = doc.select("table")
-        println("Found ${tables.size} tables")
-        tables.forEachIndexed { index, table ->
-            println("Table $index classes: ${table.classNames()}")
-        }
-
-        // Try different selectors
+        // Find the table with team standings
         val tableRows = doc.select("table tr")
         println("Found ${tableRows.size} rows in total")
-
-        // Print structure of first few rows
-        tableRows.take(3).forEachIndexed { index, row ->
-            println("\nRow $index structure:")
-            println("Cells count: ${row.select("td").size}")
-            println("Row HTML: ${row.html()}")
-        }
 
         return tableRows.drop(1).mapNotNull { row -> // drop header row
             try {
                 val cells = row.select("td")
-                if (cells.size < 9) {
+                if (cells.size < 5) {
                     println("Skipping row - insufficient cells (${cells.size})")
                     return@mapNotNull null
                 }
 
-                val teamData = TeamData(
-                    name = cells[1].text().also { println("Team name found: $it") },
-                    position = cells[0].text().toIntOrNull().also { println("Position: $it") } ?: 0,
-                    played = cells[2].text().toIntOrNull().also { println("Played: $it") } ?: 0,
-                    won = cells[3].text().toIntOrNull().also { println("Won: $it") } ?: 0,
-                    drawn = cells[4].text().toIntOrNull().also { println("Drawn: $it") } ?: 0,
-                    lost = cells[5].text().toIntOrNull().also { println("Lost: $it") } ?: 0,
-                    goalsFor = cells[6].text().toIntOrNull().also { println("Goals For: $it") } ?: 0,
-                    goalsAgainst = cells[7].text().toIntOrNull().also { println("Goals Against: $it") } ?: 0,
-                    cleanSheets = cells[8].text().toIntOrNull().also { println("Clean Sheets: $it") } ?: 0
+                val position = cells[0].text().toIntOrNull() ?: 0
+                val name = cells[1].select("strong").text()
+                val played = cells[2].text().toIntOrNull() ?: 0
+                val goalDiff = cells[3].text().toIntOrNull() ?: 0
+                val points = cells[4].text().toIntOrNull() ?: 0
+
+                println("Processing team: $name (Pos: $position, Pld: $played, GD: $goalDiff, Pts: $points)")
+
+                // Since we don't have all stats directly, we'll estimate some
+                // Using a placeholder value of 0 for stats we can't determine
+                TeamData(
+                    name = name,
+                    position = position,
+                    played = played,
+                    won = 0,  // Can't determine directly
+                    drawn = 0, // Can't determine directly
+                    lost = 0,  // Can't determine directly
+                    goalsFor = 0,    // Can't determine without additional data
+                    goalsAgainst = 0, // Can't determine without additional data
+                    cleanSheets = 0   // Can't determine without additional data
                 )
-                println("Successfully parsed team: ${teamData.name}")
-                teamData
             } catch (e: Exception) {
                 println("Error parsing row: ${e.message}")
+                e.printStackTrace()
                 null
             }
+        }.also {
+            println("Successfully parsed ${it.size} teams")
         }
     }
 
