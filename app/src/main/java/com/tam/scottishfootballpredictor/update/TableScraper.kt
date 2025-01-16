@@ -1,11 +1,14 @@
 package com.tam.scottishfootballpredictor.update
 
 import org.openqa.selenium.By
+import org.openqa.selenium.OutputType
+import org.openqa.selenium.TakesScreenshot
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.chrome.ChromeOptions
 import java.time.LocalDate
 import com.google.gson.GsonBuilder
+import java.util.concurrent.TimeUnit
 
 class TableScraper {
     private val leagues = mapOf(
@@ -14,6 +17,55 @@ class TableScraper {
         "League 1" to "https://spfl.co.uk/spfl/league/league-one/table",
         "League 2" to "https://spfl.co.uk/spfl/league/league-two/table"
     )
+
+    fun scrapeAndGenerateJson(): String {
+        var driver: WebDriver? = null
+        try {
+            println("Starting scraping process...")
+            val leagueData = mutableMapOf<String, List<TeamData>>()
+
+            val options = ChromeOptions().apply {
+                addArguments("--headless")
+                addArguments("--no-sandbox")
+                addArguments("--disable-dev-shm-usage")
+                addArguments("--disable-gpu")
+                addArguments("--window-size=1920,1080")
+            }
+
+            driver = ChromeDriver(options)
+            driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS)
+
+            leagues.forEach { (leagueName, url) ->
+                try {
+                    println("\nFetching $leagueName from $url")
+                    driver.get(url)
+
+                    // Take screenshot for debugging
+                    (driver as? TakesScreenshot)?.let {
+                        val screenshot = it.getScreenshotAs(OutputType.BYTES)
+                        println("Screenshot taken, size: ${screenshot.size} bytes")
+                    }
+
+                    val teams = scrapeTeamData(driver)
+                    println("Found ${teams.size} teams for $leagueName")
+                    if (teams.isNotEmpty()) {
+                        leagueData[leagueName] = teams
+                    }
+                } catch (e: Exception) {
+                    println("Error fetching $leagueName: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+
+            return formatToJson(leagueData)
+        } catch (e: Exception) {
+            println("Fatal error: ${e.message}")
+            e.printStackTrace()
+            return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{}}"
+        } finally {
+            driver?.quit()
+        }
+    }
 
     private fun scrapeTeamData(driver: WebDriver): List<TeamData> {
         println("Starting to parse table data")
@@ -75,56 +127,6 @@ class TableScraper {
             }
         }
     }
-
-    fun scrapeAndGenerateJson(): String {
-        var driver: WebDriver? = null
-        try {
-            println("Starting scraping process...")
-            val leagueData = mutableMapOf<String, List<TeamData>>()
-
-            val options = ChromeOptions().apply {
-                addArguments("--headless")
-                addArguments("--no-sandbox")
-                addArguments("--disable-dev-shm-usage")
-                addArguments("--disable-gpu")
-                addArguments("--window-size=1920,1080")
-            }
-
-            driver = ChromeDriver(options)
-            driver.manage().timeouts().implicitlyWait(10, java.util.concurrent.TimeUnit.SECONDS)
-
-            leagues.forEach { (leagueName, url) ->
-                try {
-                    println("\nFetching $leagueName from $url")
-                    driver.get(url)
-
-                    // Take screenshot for debugging
-                    if (driver is TakesScreenshot) {
-                        val screenshot = driver.getScreenshotAs(OutputType.BYTES)
-                        println("Screenshot taken, size: ${screenshot.size} bytes")
-                    }
-
-                    val teams = scrapeTeamData(driver)
-                    println("Found ${teams.size} teams for $leagueName")
-                    if (teams.isNotEmpty()) {
-                        leagueData[leagueName] = teams
-                    }
-                } catch (e: Exception) {
-                    println("Error fetching $leagueName: ${e.message}")
-                    e.printStackTrace()
-                }
-            }
-
-            return formatToJson(leagueData)
-        } catch (e: Exception) {
-            println("Fatal error: ${e.message}")
-            e.printStackTrace()
-            return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{}}"
-        } finally {
-            driver?.quit()
-        }
-    }
-}
 
     private fun formatToJson(leagueData: Map<String, List<TeamData>>): String {
         val statsUpdate = StatsUpdate(
