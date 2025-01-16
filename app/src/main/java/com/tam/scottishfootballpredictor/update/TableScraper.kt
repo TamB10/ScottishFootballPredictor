@@ -7,93 +7,95 @@ import com.google.gson.GsonBuilder
 
 class TableScraper {
     private val leagues = mapOf(
-        "Premiership" to "https://www.bbc.co.uk/sport/football/scottish-premiership/table",
-        "Championship" to "https://www.bbc.co.uk/sport/football/scottish-championship/table",
-        "League 1" to "https://www.bbc.co.uk/sport/football/scottish-league-one/table",
-        "League 2" to "https://www.bbc.co.uk/sport/football/scottish-league-two/table"
+        "Premiership" to "https://www.skysports.com/scottish-premiership-table",
+        "Championship" to "https://www.skysports.com/scottish-championship-table",
+        "League 1" to "https://www.skysports.com/scottish-league-one-table",
+        "League 2" to "https://www.skysports.com/scottish-league-two-table"
     )
 
     fun scrapeAndGenerateJson(): String {
         try {
-            val leagueData = leagues.mapValues { (leagueName, url) ->
+            println("Starting scraping process...")
+            val leagueData = mutableMapOf<String, List<TeamData>>()
+
+            leagues.forEach { (leagueName, url) ->
                 try {
-                    println("Scraping $leagueName from $url")
+                    println("\nFetching $leagueName from $url")
                     val doc = Jsoup.connect(url)
                         .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36")
+                        .timeout(30000)
                         .get()
-                    scrapeTeamData(doc)
+                    println("Successfully fetched $leagueName page")
+
+                    val teams = scrapeTeamData(doc)
+                    println("Found ${teams.size} teams for $leagueName")
+                    if (teams.isNotEmpty()) {
+                        leagueData[leagueName] = teams
+                    }
                 } catch (e: Exception) {
-                    println("Error scraping $leagueName: ${e.message}")
+                    println("Error fetching $leagueName: ${e.message}")
                     e.printStackTrace()
-                    emptyList()
                 }
             }
+
             return formatToJson(leagueData)
         } catch (e: Exception) {
-            println("Fatal error in scraping: ${e.message}")
+            println("Fatal error: ${e.message}")
             e.printStackTrace()
-            return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{},\"error\":\"${e.message}\"}"
+            return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{}}"
         }
     }
 
     private fun scrapeTeamData(doc: Document): List<TeamData> {
-        println("\n=== Starting to scrape team data ===")
-        println("Document HTML: ${doc.html()}")  // See what HTML we're getting
-
-        val table = doc.select("table.gs-o-table")
-        println("Found ${table.size} tables with class gs-o-table")
-
-        // Try alternate selectors if main one fails
-        if (table.isEmpty()) {
-            println("Trying alternate selectors...")
-            val allTables = doc.select("table")
-            println("Found ${allTables.size} total tables")
-            allTables.forEachIndexed { index, t ->
-                println("Table $index classes: ${t.classNames()}")
-                println("Table $index content: ${t.html()}")
+        println("Starting to parse table data")
+        try {
+            // First print all table classes we find
+            doc.select("table").forEach { table ->
+                println("Found table with classes: ${table.classNames()}")
             }
-        }
 
-        val rows = table.select("tr:not(:first-child)")  // Skip header row
-        println("Found ${rows.size} team rows")
+            val rows = doc.select("table.standing-table tbody tr")
+            println("Found ${rows.size} rows in standing-table")
 
-        return rows.mapNotNull { row ->
-            try {
-                println("\nProcessing row: ${row.html()}")
-                val cells = row.select("td")
-                println("Found ${cells.size} cells in row")
+            return rows.mapNotNull { row ->
+                try {
+                    val cells = row.select("td")
+                    println("\nProcessing row with ${cells.size} cells")
+                    cells.forEachIndexed { index, cell ->
+                        println("Cell $index content: '${cell.text()}'")
+                    }
 
-                cells.forEachIndexed { index, cell ->
-                    println("Cell $index content: ${cell.text()}")
+                    if (cells.size >= 8) {
+                        TeamData(
+                            name = cells[1].text(),
+                            position = cells[0].text().toIntOrNull() ?: 0,
+                            played = cells[2].text().toIntOrNull() ?: 0,
+                            won = cells[3].text().toIntOrNull() ?: 0,
+                            drawn = cells[4].text().toIntOrNull() ?: 0,
+                            lost = cells[5].text().toIntOrNull() ?: 0,
+                            goalsFor = cells[6].text().toIntOrNull() ?: 0,
+                            goalsAgainst = cells[7].text().toIntOrNull() ?: 0,
+                            cleanSheets = 0
+                        ).also { team ->
+                            println("Successfully parsed team: ${team.name}")
+                        }
+                    } else {
+                        println("Skipping row - insufficient cells")
+                        null
+                    }
+                } catch (e: Exception) {
+                    println("Error parsing row: ${e.message}")
+                    e.printStackTrace()
+                    null
                 }
-
-                val teamData = TeamData(
-                    position = cells.getOrNull(0)?.text()?.toIntOrNull() ?: 0,
-                    name = cells.getOrNull(1)?.select("abbr")?.attr("title") ?:
-                    cells.getOrNull(1)?.text() ?: "Unknown",
-                    played = cells.getOrNull(2)?.text()?.toIntOrNull() ?: 0,
-                    won = cells.getOrNull(3)?.text()?.toIntOrNull() ?: 0,
-                    drawn = cells.getOrNull(4)?.text()?.toIntOrNull() ?: 0,
-                    lost = cells.getOrNull(5)?.text()?.toIntOrNull() ?: 0,
-                    goalsFor = cells.getOrNull(6)?.text()?.toIntOrNull() ?: 0,
-                    goalsAgainst = cells.getOrNull(7)?.text()?.toIntOrNull() ?: 0,
-                    cleanSheets = 0
-                )
-
-                println("Created team data: $teamData")
-                teamData
-
-            } catch (e: Exception) {
-                println("Error processing row: ${e.message}")
-                println("Row HTML causing error: ${row.html()}")
-                e.printStackTrace()
-                null
             }
-        }.also { teams ->
-            println("\nTotal teams parsed: ${teams.size}")
-            teams.forEach { println(it) }
+        } catch (e: Exception) {
+            println("Error parsing table: ${e.message}")
+            e.printStackTrace()
+            return emptyList()
         }
     }
+
     private fun formatToJson(leagueData: Map<String, List<TeamData>>): String {
         val statsUpdate = StatsUpdate(
             version = "1.0.${LocalDate.now()}",
@@ -119,12 +121,15 @@ class TableScraper {
             }
         )
 
-        return GsonBuilder().setPrettyPrinting().create().toJson(statsUpdate)
+        println("\nGenerating JSON output")
+        val json = GsonBuilder().setPrettyPrinting().create().toJson(statsUpdate)
+        println("JSON length: ${json.length}")
+        return json
     }
 
     private fun calculateForm(team: TeamData): Form {
-        val winRate = team.won.toDouble() / team.played
-        val drawRate = team.drawn.toDouble() / team.played
+        val winRate = team.won.toDouble() / team.played.coerceAtLeast(1)
+        val drawRate = team.drawn.toDouble() / team.played.coerceAtLeast(1)
 
         return Form(
             last5 = List(5) {
