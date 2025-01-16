@@ -40,30 +40,16 @@ android {
 
 // Define the runScraper task for the Android app's main source set
 tasks.register<JavaExec>("runScraper") {
+    dependsOn("compileJava", "compileKotlin")
     group = "scraping"
     description = "Runs the table scraper"
-
-    dependsOn("compileDebugKotlin")
-
-    // Define inputs and outputs to help Gradle track task execution
-    outputs.dir("$projectDir/../stats")
-
-    // Set up classpath and main class
     classpath = files(
         android.sourceSets.getByName("main").java.srcDirs,
+        project.buildDir.resolve("intermediates/javac/debug/classes"),
         project.buildDir.resolve("tmp/kotlin-classes/debug"),
-        configurations.getByName("debugCompileClasspath")
+        configurations.getByName("implementation")
     )
-
     mainClass.set("com.tam.scottishfootballpredictor.update.StatsScraperKt")
-
-    // Add debugging
-    jvmArgs = listOf("-Dorg.slf4j.simpleLogger.defaultLogLevel=debug")
-
-    // Ensure the stats directory exists
-    doFirst {
-        mkdir("$projectDir/../stats")
-    }
 }
 
 dependencies {
@@ -78,6 +64,8 @@ dependencies {
 
     // Work Manager
     implementation("androidx.work:work-runtime-ktx:2.8.1")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // Jsoup for web scraping
     implementation("org.jsoup:jsoup:1.16.2")
