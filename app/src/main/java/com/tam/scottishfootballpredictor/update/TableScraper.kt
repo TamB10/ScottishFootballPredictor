@@ -21,16 +21,25 @@ class TableScraper {
             leagues.forEach { (leagueName, url) ->
                 try {
                     println("\nFetching $leagueName from $url")
-                    val doc = Jsoup.connect(url)
+                    val connection = Jsoup.connect(url)
                         .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36")
                         .timeout(30000)
-                        .get()
-                    println("Successfully fetched $leagueName page")
+                        .ignoreHttpErrors(true)  // Added to see error responses
 
-                    val teams = scrapeTeamData(doc)
-                    println("Found ${teams.size} teams for $leagueName")
-                    if (teams.isNotEmpty()) {
-                        leagueData[leagueName] = teams
+                    val response = connection.execute()
+                    println("Response status code: ${response.statusCode()}")
+
+                    if (response.statusCode() == 200) {
+                        val doc = response.parse()
+                        println("Successfully fetched $leagueName page")
+
+                        val teams = scrapeTeamData(doc)
+                        println("Found ${teams.size} teams for $leagueName")
+                        if (teams.isNotEmpty()) {
+                            leagueData[leagueName] = teams
+                        }
+                    } else {
+                        println("Failed to fetch $leagueName: Status Code ${response.statusCode()}")
                     }
                 } catch (e: Exception) {
                     println("Error fetching $leagueName: ${e.message}")
