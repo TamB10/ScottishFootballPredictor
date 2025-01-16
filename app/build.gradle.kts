@@ -45,15 +45,25 @@ tasks.register<JavaExec>("runScraper") {
 
     dependsOn("compileDebugKotlin")
 
-    doFirst {
-        classpath = files(
-            android.sourceSets.getByName("main").java.srcDirs,
-            project.buildDir.resolve("tmp/kotlin-classes/debug"),
-            configurations.getByName("debugCompileClasspath")
-        )
-    }
+    // Define inputs and outputs to help Gradle track task execution
+    outputs.dir("$projectDir/../stats")
+
+    // Set up classpath and main class
+    classpath = files(
+        android.sourceSets.getByName("main").java.srcDirs,
+        project.buildDir.resolve("tmp/kotlin-classes/debug"),
+        configurations.getByName("debugCompileClasspath")
+    )
 
     mainClass.set("com.tam.scottishfootballpredictor.update.StatsScraperKt")
+
+    // Add debugging
+    jvmArgs = listOf("-Dorg.slf4j.simpleLogger.defaultLogLevel=debug")
+
+    // Ensure the stats directory exists
+    doFirst {
+        mkdir("$projectDir/../stats")
+    }
 }
 
 dependencies {

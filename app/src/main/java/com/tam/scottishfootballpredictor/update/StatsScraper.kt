@@ -3,10 +3,18 @@ package com.tam.scottishfootballpredictor.update
 import java.io.File
 
 fun main() {
-    val scraper = TableScraper()
-    val json = scraper.scrapeAndGenerateJson()
+    println("Starting scraper...")
+    try {
+        val scraper = TableScraper()
+        val json = scraper.scrapeAndGenerateJson()
+        println("Generated JSON: $json")
 
-    // Save to stats directory
-    File("stats").mkdirs()
-    File("stats/stats.json").writeText(json)
+        val statsFile = File("stats/stats.json")
+        statsFile.parentFile?.mkdirs()
+        statsFile.writeText(json)
+        println("Stats written to: ${statsFile.absolutePath}")
+    } catch (e: Exception) {
+        println("Error running scraper:")
+        e.printStackTrace()
+    }
 }
