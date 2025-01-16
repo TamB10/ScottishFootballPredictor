@@ -17,58 +17,86 @@ class TableScraper {
         try {
             val leagueData = leagues.mapValues { (leagueName, url) ->
                 try {
-                    println("Attempting to scrape $leagueName from $url")
-
-                    val doc = Jsoup.connect(url)
+                    println("Starting to scrape $leagueName from $url")
+                    val response = Jsoup.connect(url)
                         .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                        .timeout(10000)
-                        .get()
+                        .timeout(30000) // Increased timeout
+                        .ignoreHttpErrors(true) // Add this to see any HTTP errors
+                        .execute()
 
-                    println("Got response for $leagueName. Document length: ${doc.html().length}")
+                    println("HTTP Status Code for $leagueName: ${response.statusCode()}")
+                    println("HTTP Status Message: ${response.statusMessage()}")
 
-                    scrapeTeamData(doc)
+                    val doc = response.parse()
+                    println("HTML Content Length: ${doc.html().length}")
+                    println("First 500 chars of HTML: ${doc.html().take(500)}")
+
+                    val teamsData = scrapeTeamData(doc)
+                    println("Teams found for $leagueName: ${teamsData.size}")
+                    teamsData
                 } catch (e: Exception) {
-                    println("Error scraping $leagueName: ${e.message}")
+                    println("Error scraping $leagueName")
                     e.printStackTrace()
                     emptyList()
                 }
             }
 
-            println("Finished scraping all leagues")
+            // Check if any data was scraped
+            val totalTeams = leagueData.values.sumOf { it.size }
+            println("Total teams scraped across all leagues: $totalTeams")
+
             return formatToJson(leagueData)
         } catch (e: Exception) {
-            println("Fatal error in scraping: ${e.message}")
+            println("Fatal error in scraping")
             e.printStackTrace()
             return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{},\"error\":\"${e.message}\"}"
         }
     }
 
     private fun scrapeTeamData(doc: Document): List<TeamData> {
-        val table = doc.select("table.league-table")
-        if (table.isEmpty()) {
-            println("Table not found. Available classes: ${doc.select("table").map { it.className() }}")
-            return emptyList()
+        println("\nStarting to parse document")
+
+        // Try to find the table first
+        val tables = doc.select("table")
+        println("Found ${tables.size} tables")
+        tables.forEachIndexed { index, table ->
+            println("Table $index classes: ${table.classNames()}")
         }
 
-        val rows = table.select("tbody tr")
-        println("Found ${rows.size} team rows")
+        // Try different selectors
+        val tableRows = doc.select("table tr")
+        println("Found ${tableRows.size} rows in total")
 
-        return rows.mapNotNull { row ->
+        // Print structure of first few rows
+        tableRows.take(3).forEachIndexed { index, row ->
+            println("\nRow $index structure:")
+            println("Cells count: ${row.select("td").size}")
+            println("Row HTML: ${row.html()}")
+        }
+
+        return tableRows.drop(1).mapNotNull { row -> // drop header row
             try {
-                TeamData(
-                    name = row.select("td.team-name").text().also { println("Team name: $it") },
-                    position = row.select("td.position").text().toIntOrNull() ?: 0,
-                    played = row.select("td.played").text().toIntOrNull() ?: 0,
-                    won = row.select("td.won").text().toIntOrNull() ?: 0,
-                    drawn = row.select("td.drawn").text().toIntOrNull() ?: 0,
-                    lost = row.select("td.lost").text().toIntOrNull() ?: 0,
-                    goalsFor = row.select("td.goals-for").text().toIntOrNull() ?: 0,
-                    goalsAgainst = row.select("td.goals-against").text().toIntOrNull() ?: 0,
-                    cleanSheets = row.select("td.clean-sheets").text().toIntOrNull() ?: 0
+                val cells = row.select("td")
+                if (cells.size < 9) {
+                    println("Skipping row - insufficient cells (${cells.size})")
+                    return@mapNotNull null
+                }
+
+                val teamData = TeamData(
+                    name = cells[1].text().also { println("Team name found: $it") },
+                    position = cells[0].text().toIntOrNull().also { println("Position: $it") } ?: 0,
+                    played = cells[2].text().toIntOrNull().also { println("Played: $it") } ?: 0,
+                    won = cells[3].text().toIntOrNull().also { println("Won: $it") } ?: 0,
+                    drawn = cells[4].text().toIntOrNull().also { println("Drawn: $it") } ?: 0,
+                    lost = cells[5].text().toIntOrNull().also { println("Lost: $it") } ?: 0,
+                    goalsFor = cells[6].text().toIntOrNull().also { println("Goals For: $it") } ?: 0,
+                    goalsAgainst = cells[7].text().toIntOrNull().also { println("Goals Against: $it") } ?: 0,
+                    cleanSheets = cells[8].text().toIntOrNull().also { println("Clean Sheets: $it") } ?: 0
                 )
+                println("Successfully parsed team: ${teamData.name}")
+                teamData
             } catch (e: Exception) {
                 println("Error parsing row: ${e.message}")
-                println("Row HTML: ${row.html()}")
                 null
             }
         }
