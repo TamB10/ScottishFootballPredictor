@@ -1,46 +1,34 @@
 package com.tam.scottishfootballpredictor.update
 
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import com.google.gson.GsonBuilder
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import java.time.LocalDate
+import com.google.gson.GsonBuilder
 
 class TableScraper {
-    private val client = OkHttpClient()
-
     private val leagues = mapOf(
-        "Premiership" to "https://spfl.co.uk/api/competition.php?feed_type=league&id=premiership",
-        "Championship" to "https://spfl.co.uk/api/competition.php?feed_type=league&id=championship",
-        "League 1" to "https://spfl.co.uk/api/competition.php?feed_type=league&id=league-one",
-        "League 2" to "https://spfl.co.uk/api/competition.php?feed_type=league&id=league-two"
+        "Premiership" to "https://www.bbc.co.uk/sport/football/scottish-premiership/table",
+        "Championship" to "https://www.bbc.co.uk/sport/football/scottish-championship/table",
+        "League 1" to "https://www.bbc.co.uk/sport/football/scottish-league-one/table",
+        "League 2" to "https://www.bbc.co.uk/sport/football/scottish-league-two/table"
     )
 
     fun scrapeAndGenerateJson(): String {
         try {
             val leagueData = leagues.mapValues { (leagueName, url) ->
                 try {
-                    println("Fetching data for $leagueName from $url")
-
-                    val request = Request.Builder()
-                        .url(url)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                        .build()
-
-                    client.newCall(request).execute().use { response ->
-                        val body = response.body?.string()
-                        println("Response for $leagueName: $body")
-                        parseTeamData(body ?: "")
-                    }
-
+                    println("Scraping $leagueName from $url")
+                    val doc = Jsoup.connect(url)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36")
+                        .get()
+                    scrapeTeamData(doc)
                 } catch (e: Exception) {
-                    println("Error fetching $leagueName: ${e.message}")
+                    println("Error scraping $leagueName: ${e.message}")
                     e.printStackTrace()
                     emptyList()
                 }
             }
-
             return formatToJson(leagueData)
-
         } catch (e: Exception) {
             println("Fatal error in scraping: ${e.message}")
             e.printStackTrace()
@@ -48,17 +36,40 @@ class TableScraper {
         }
     }
 
-    private fun parseTeamData(jsonString: String): List<TeamData> {
-        try {
-            println("Parsing JSON response: $jsonString")
+    private fun scrapeTeamData(doc: Document): List<TeamData> {
+        val rows = doc.select("table.gs-o-table tr")
+        println("Found ${rows.size} rows")
 
-            // For now, return empty list until we see the actual JSON structure
-            return emptyList()
+        return rows.mapNotNull { row ->
+            try {
+                // Skip header rows
+                if (row.select("th").isNotEmpty()) {
+                    return@mapNotNull null
+                }
 
-        } catch (e: Exception) {
-            println("Error parsing response: ${e.message}")
-            e.printStackTrace()
-            return emptyList()
+                val cells = row.select("td")
+                if (cells.isEmpty()) {
+                    return@mapNotNull null
+                }
+
+                TeamData(
+                    position = cells.getOrNull(0)?.text()?.toIntOrNull() ?: 0,
+                    name = cells.getOrNull(1)?.select("abbr")?.attr("title") ?:
+                    cells.getOrNull(1)?.text() ?: "Unknown",
+                    played = cells.getOrNull(2)?.text()?.toIntOrNull() ?: 0,
+                    won = cells.getOrNull(3)?.text()?.toIntOrNull() ?: 0,
+                    drawn = cells.getOrNull(4)?.text()?.toIntOrNull() ?: 0,
+                    lost = cells.getOrNull(5)?.text()?.toIntOrNull() ?: 0,
+                    goalsFor = cells.getOrNull(6)?.text()?.toIntOrNull() ?: 0,
+                    goalsAgainst = cells.getOrNull(7)?.text()?.toIntOrNull() ?: 0,
+                    cleanSheets = 0  // Not available in BBC table
+                ).also { team ->
+                    println("Parsed team: ${team.name}, Pos: ${team.position}")
+                }
+            } catch (e: Exception) {
+                println("Error parsing row: ${e.message}")
+                null
+            }
         }
     }
 
