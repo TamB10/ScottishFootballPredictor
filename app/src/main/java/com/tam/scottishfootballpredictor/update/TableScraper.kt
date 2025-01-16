@@ -56,41 +56,57 @@ class TableScraper {
     private fun scrapeTeamData(doc: Document): List<TeamData> {
         println("\nStarting to parse document")
 
-        // Find the table with team standings
         val tableRows = doc.select("table tr")
         println("Found ${tableRows.size} rows in total")
 
         return tableRows.drop(1).mapNotNull { row -> // drop header row
             try {
                 val cells = row.select("td")
-                if (cells.size < 5) {
+                if (cells.size < 15) {
                     println("Skipping row - insufficient cells (${cells.size})")
                     return@mapNotNull null
                 }
 
+                // Mapping based on actual table structure:
+                // Position | Team | HOME (P W D L GF GA) | AWAY (W D L GF GA) | GD | PTS
                 val position = cells[0].text().toIntOrNull() ?: 0
-                val name = cells[1].select("strong").text()
-                val played = cells[2].text().toIntOrNull() ?: 0
-                val goalDiff = cells[3].text().toIntOrNull() ?: 0
-                val points = cells[4].text().toIntOrNull() ?: 0
+                val name = cells[1].text()
 
-                println("Processing team: $name (Pos: $position, Pld: $played, GD: $goalDiff, Pts: $points)")
+                // Home stats
+                val homePlayed = cells[2].text().toIntOrNull() ?: 0
+                val homeWins = cells[3].text().toIntOrNull() ?: 0
+                val homeDraws = cells[4].text().toIntOrNull() ?: 0
+                val homeLosses = cells[5].text().toIntOrNull() ?: 0
+                val homeGoalsFor = cells[6].text().toIntOrNull() ?: 0
+                val homeGoalsAgainst = cells[7].text().toIntOrNull() ?: 0
 
-                // Since we don't have all stats directly, we'll estimate some
-                // Using a placeholder value of 0 for stats we can't determine
+                // Away stats
+                val awayWins = cells[8].text().toIntOrNull() ?: 0
+                val awayDraws = cells[9].text().toIntOrNull() ?: 0
+                val awayLosses = cells[10].text().toIntOrNull() ?: 0
+                val awayGoalsFor = cells[11].text().toIntOrNull() ?: 0
+                val awayGoalsAgainst = cells[12].text().toIntOrNull() ?: 0
+
+                // Total stats
+                val goalDiff = cells[13].text().toIntOrNull() ?: 0
+                val points = cells[14].text().toIntOrNull() ?: 0
+
+                println("Processing team: $name (Pos: $position, Pts: $points)")
+
                 TeamData(
                     name = name,
                     position = position,
-                    played = played,
-                    won = 0,  // Can't determine directly
-                    drawn = 0, // Can't determine directly
-                    lost = 0,  // Can't determine directly
-                    goalsFor = 0,    // Can't determine without additional data
-                    goalsAgainst = 0, // Can't determine without additional data
-                    cleanSheets = 0   // Can't determine without additional data
+                    played = homePlayed + (awayWins + awayDraws + awayLosses),
+                    won = homeWins + awayWins,
+                    drawn = homeDraws + awayDraws,
+                    lost = homeLosses + awayLosses,
+                    goalsFor = homeGoalsFor + awayGoalsFor,
+                    goalsAgainst = homeGoalsAgainst + awayGoalsAgainst,
+                    cleanSheets = 0  // We'll need to calculate this separately if needed
                 )
             } catch (e: Exception) {
                 println("Error parsing row: ${e.message}")
+                println("Row HTML: ${row.html()}")
                 e.printStackTrace()
                 null
             }
