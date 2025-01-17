@@ -12,17 +12,14 @@ object StatsScraper {
             println("Generated JSON: $json")
 
             val statsFile = File("stats/stats.json")
+            println("Writing to: ${statsFile.absolutePath}")
             statsFile.parentFile?.mkdirs()
             statsFile.writeText(json)
-            println("Stats written to: ${statsFile.absolutePath}")
+            println("Successfully wrote stats to file")
+
         } catch (e: Exception) {
             println("Error running scraper:")
             e.printStackTrace()
-
-            // Write empty JSON on error
-            val statsFile = File("stats/stats.json")
-            statsFile.parentFile?.mkdirs()
-            statsFile.writeText("{\"version\":\"1.0.0\",\"lastUpdated\":\"${java.time.LocalDate.now()}\",\"leagues\":{}}")
         }
     }
 }

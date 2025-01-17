@@ -29,24 +29,41 @@ class TableScraper {
                         .header("User-Agent", "Mozilla/5.0")
                         .build()
 
-                    client.newCall(request).execute().use { response ->
-                        val body = response.body?.string()
-                        println("Response for $leagueName: ${body?.take(100)}...")
+                    // Log before API call
+                    println("Making API call for $leagueName")
 
-                        // Parse response and create team data
-                        val teams = parseResponse(body ?: "")
-                        if (teams.isNotEmpty()) {
-                            leagueData[leagueName] = teams
-                        }
+                    client.newCall(request).execute().use { response ->
+                        println("Got response code: ${response.code}")
+
+                        val body = response.body?.string()
+                        println("Response body (first 100 chars): ${body?.take(100)}")
+
+                        // Get dummy data
+                        val teams = listOf(
+                            TeamData("Celtic", 1, 20, 15, 3, 2, 45, 15, 8),
+                            TeamData("Rangers", 2, 20, 14, 4, 2, 40, 18, 7)
+                        )
+                        println("Created ${teams.size} dummy teams for $leagueName")
+
+                        leagueData[leagueName] = teams
+                        println("Added teams to leagueData")
                     }
                 } catch (e: Exception) {
                     println("Error fetching $leagueName: ${e.message}")
+                    e.printStackTrace()
                 }
             }
 
-            return formatToJson(leagueData)
+            println("\nCreating JSON from league data with ${leagueData.size} leagues")
+            val json = formatToJson(leagueData)
+            println("JSON length: ${json.length}")
+            println("First 200 chars of JSON: ${json.take(200)}")
+
+            return json
+
         } catch (e: Exception) {
             println("Fatal error: ${e.message}")
+            e.printStackTrace()
             return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{}}"
         }
     }
