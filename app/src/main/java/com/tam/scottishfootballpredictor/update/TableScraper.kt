@@ -1,131 +1,62 @@
 package com.tam.scottishfootballpredictor.update
 
-import org.openqa.selenium.By
-import org.openqa.selenium.OutputType
-import org.openqa.selenium.TakesScreenshot
-import org.openqa.selenium.WebDriver
-import org.openqa.selenium.chrome.ChromeDriver
-import org.openqa.selenium.chrome.ChromeOptions
-import java.time.LocalDate
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import com.google.gson.GsonBuilder
-import java.util.concurrent.TimeUnit
+import java.time.LocalDate
 
 class TableScraper {
+    private val client = OkHttpClient()
+
+    // SofaScore API endpoint for Scottish leagues
     private val leagues = mapOf(
-        "Premiership" to "https://spfl.co.uk/spfl/league/premiership/table",
-        "Championship" to "https://spfl.co.uk/spfl/league/championship/table",
-        "League 1" to "https://spfl.co.uk/spfl/league/league-one/table",
-        "League 2" to "https://spfl.co.uk/spfl/league/league-two/table"
+        "Premiership" to "https://api.sofascore.com/api/v1/tournament/12/standing/total",
+        "Championship" to "https://api.sofascore.com/api/v1/tournament/13/standing/total",
+        "League 1" to "https://api.sofascore.com/api/v1/tournament/14/standing/total",
+        "League 2" to "https://api.sofascore.com/api/v1/tournament/15/standing/total"
     )
 
     fun scrapeAndGenerateJson(): String {
-        var driver: WebDriver? = null
         try {
-            println("Starting scraping process...")
+            println("Starting data fetch...")
             val leagueData = mutableMapOf<String, List<TeamData>>()
-
-            val options = ChromeOptions().apply {
-                addArguments("--headless")
-                addArguments("--no-sandbox")
-                addArguments("--disable-dev-shm-usage")
-                addArguments("--disable-gpu")
-                addArguments("--window-size=1920,1080")
-            }
-
-            driver = ChromeDriver(options)
-            driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS)
 
             leagues.forEach { (leagueName, url) ->
                 try {
                     println("\nFetching $leagueName from $url")
-                    driver.get(url)
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "Mozilla/5.0")
+                        .build()
 
-                    // Take screenshot for debugging
-                    (driver as? TakesScreenshot)?.let {
-                        val screenshot = it.getScreenshotAs(OutputType.BYTES)
-                        println("Screenshot taken, size: ${screenshot.size} bytes")
-                    }
+                    client.newCall(request).execute().use { response ->
+                        val body = response.body?.string()
+                        println("Response for $leagueName: ${body?.take(100)}...")
 
-                    val teams = scrapeTeamData(driver)
-                    println("Found ${teams.size} teams for $leagueName")
-                    if (teams.isNotEmpty()) {
-                        leagueData[leagueName] = teams
+                        // Parse response and create team data
+                        val teams = parseResponse(body ?: "")
+                        if (teams.isNotEmpty()) {
+                            leagueData[leagueName] = teams
+                        }
                     }
                 } catch (e: Exception) {
                     println("Error fetching $leagueName: ${e.message}")
-                    e.printStackTrace()
                 }
             }
 
             return formatToJson(leagueData)
         } catch (e: Exception) {
             println("Fatal error: ${e.message}")
-            e.printStackTrace()
             return "{\"version\":\"1.0.0\",\"lastUpdated\":\"${LocalDate.now()}\",\"leagues\":{}}"
-        } finally {
-            driver?.quit()
         }
     }
 
-    private fun scrapeTeamData(driver: WebDriver): List<TeamData> {
-        println("Starting to parse table data")
-
-        // Wait for table to load
-        Thread.sleep(5000)  // Give more time for JavaScript to load
-
-        // Print page source to debug
-        println("Page source: ${driver.pageSource}")
-
-        // Try multiple table selectors
-        val rows = try {
-            driver.findElements(By.cssSelector("table tbody tr")).also {
-                println("Found ${it.size} rows using table tbody tr")
-            }
-        } catch (e: Exception) {
-            println("Error finding rows with first selector: ${e.message}")
-            try {
-                driver.findElements(By.cssSelector(".league-table tr")).also {
-                    println("Found ${it.size} rows using .league-table tr")
-                }
-            } catch (e: Exception) {
-                println("Error finding rows with second selector: ${e.message}")
-                emptyList()
-            }
-        }
-
-        println("Processing ${rows.size} rows")
-
-        return rows.mapNotNull { row ->
-            try {
-                val cells = row.findElements(By.tagName("td"))
-                println("Processing row with ${cells.size} cells")
-                cells.forEach { cell ->
-                    println("Cell content: ${cell.text}")
-                }
-
-                if (cells.size >= 9) {
-                    TeamData(
-                        name = cells[0].text,
-                        position = cells[0].text.toIntOrNull() ?: 0,
-                        played = cells[2].text.toIntOrNull() ?: 0,
-                        won = cells[3].text.toIntOrNull() ?: 0,
-                        drawn = cells[4].text.toIntOrNull() ?: 0,
-                        lost = cells[5].text.toIntOrNull() ?: 0,
-                        goalsFor = cells[6].text.toIntOrNull() ?: 0,
-                        goalsAgainst = cells[7].text.toIntOrNull() ?: 0,
-                        cleanSheets = cells[8].text.toIntOrNull() ?: 0
-                    ).also { team ->
-                        println("Successfully parsed team: $team")
-                    }
-                } else {
-                    println("Skipping row - insufficient cells")
-                    null
-                }
-            } catch (e: Exception) {
-                println("Error processing row: ${e.message}")
-                null
-            }
-        }
+    private fun parseResponse(jsonString: String): List<TeamData> {
+        // For now, return dummy data to test the pipeline
+        return listOf(
+            TeamData("Celtic", 1, 20, 15, 3, 2, 45, 15, 8),
+            TeamData("Rangers", 2, 20, 14, 4, 2, 40, 18, 7)
+        )
     }
 
     private fun formatToJson(leagueData: Map<String, List<TeamData>>): String {
@@ -153,25 +84,11 @@ class TableScraper {
             }
         )
 
-        println("\nGenerating JSON output")
-        val json = GsonBuilder().setPrettyPrinting().create().toJson(statsUpdate)
-        println("JSON length: ${json.length}")
-        return json
+        return GsonBuilder().setPrettyPrinting().create().toJson(statsUpdate)
     }
 
     private fun calculateForm(team: TeamData): Form {
-        val winRate = team.won.toDouble() / team.played.coerceAtLeast(1)
-        val drawRate = team.drawn.toDouble() / team.played.coerceAtLeast(1)
-
-        return Form(
-            last5 = List(5) {
-                when {
-                    Math.random() < winRate -> "W"
-                    Math.random() < winRate + drawRate -> "D"
-                    else -> "L"
-                }
-            }
-        )
+        return Form(last5 = listOf("W", "D", "L", "W", "W"))
     }
 }
 
