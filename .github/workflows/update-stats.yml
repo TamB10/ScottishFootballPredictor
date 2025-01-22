@@ -4,27 +4,28 @@ on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:  # Allows manual trigger
-
+  
 jobs:
-  update-stats:
+  update_stats:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Kotlin
-        uses: fwilhe2/setup-kotlin@main
+      - name: Set up JDK
+        uses: actions/setup-java@v8
         with:
-          version: '1.8.0'
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl jq
+      - name: Install Kotlin
+        run: sudo apt-get install -y kotlin
 
-      - name: Fetch and update stats
+      - name: Build the project
+        run: ./gradlew build
+
+      - name: Run Kotlin script
         env:
           API_KEY: ${{ secrets.API_FOOTBALL_KEY }}
-        run: |
-          kotlin .github/scripts/UpdateStats.kts
+        run: kotlin .github/scripts/UpdateStats.kts
